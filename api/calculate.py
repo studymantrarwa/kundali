@@ -1,1173 +1,2332 @@
-from http.server import BaseHTTPRequestHandler
-import json
-import datetime
-import zoneinfo
-import swisseph as swe
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 
+<title>Study Mantra • Kundli Chart</title>
 
-# =========================================================
-# STUDY MANTRA - KUNDLI CALCULATION ENGINE
-# Swiss Ephemeris + Lahiri Ayanamsha
-# =========================================================
+<style>
 
-SIGNS = [
-    "Aries",
-    "Taurus",
-    "Gemini",
-    "Cancer",
-    "Leo",
-    "Virgo",
-    "Libra",
-    "Scorpio",
-    "Sagittarius",
-    "Capricorn",
-    "Aquarius",
-    "Pisces",
-]
-
-PLANETS = {
-    "Sun": swe.SUN,
-    "Moon": swe.MOON,
-    "Mars": swe.MARS,
-    "Mercury": swe.MERCURY,
-    "Jupiter": swe.JUPITER,
-    "Venus": swe.VENUS,
-    "Saturn": swe.SATURN,
-    "Rahu": swe.MEAN_NODE,
+*{
+  box-sizing:border-box;
 }
 
-NAKSHATRAS = [
-    "Ashwini",
-    "Bharani",
-    "Krittika",
-    "Rohini",
-    "Mrigashira",
-    "Ardra",
-    "Punarvasu",
-    "Pushya",
-    "Ashlesha",
-    "Magha",
-    "Purva Phalguni",
-    "Uttara Phalguni",
-    "Hasta",
-    "Chitra",
-    "Swati",
-    "Vishakha",
-    "Anuradha",
-    "Jyeshtha",
-    "Mula",
-    "Purva Ashadha",
-    "Uttara Ashadha",
-    "Shravana",
-    "Dhanishtha",
-    "Shatabhisha",
-    "Purva Bhadrapada",
-    "Uttara Bhadrapada",
-    "Revati",
-]
-
-# =========================================================
-# VIMSHOTTARI DASHA ORDER
-# =========================================================
-
-DASHA_LORDS = [
-    "Ketu",
-    "Venus",
-    "Sun",
-    "Moon",
-    "Mars",
-    "Rahu",
-    "Jupiter",
-    "Saturn",
-    "Mercury",
-]
-
-DASHA_YEARS = {
-    "Ketu": 7,
-    "Venus": 20,
-    "Sun": 6,
-    "Moon": 10,
-    "Mars": 7,
-    "Rahu": 18,
-    "Jupiter": 16,
-    "Saturn": 19,
-    "Mercury": 17,
+body{
+  margin:0;
+  padding:12px;
+  background:#f5f6fa;
+  color:#172033;
+  font-family:Arial,sans-serif;
 }
 
-TOTAL_DASHA_YEARS = 120.0
+.wrap{
+  width:100%;
+  max-width:850px;
+  margin:auto;
+}
 
-# Average astronomical year
-YEAR_DAYS = 365.2425
+.card{
+  background:#fff;
+  border:1px solid #e0e4eb;
+  border-radius:18px;
+  padding:18px;
+  margin-bottom:15px;
+  box-shadow:0 7px 25px rgba(0,0,0,.06);
+}
 
-# Lahiri ayanamsha
-swe.set_sid_mode(swe.SIDM_LAHIRI)
+h1{
+  font-size:24px;
+  margin:0 0 5px;
+}
+
+h2{
+  font-size:20px;
+  margin:0 0 15px;
+}
+
+.sub{
+  color:#667085;
+  font-size:13px;
+  line-height:1.5;
+}
+
+.info-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:10px;
+}
+
+.info{
+  background:#f7f8fc;
+  border:1px solid #e5e7ed;
+  border-radius:12px;
+  padding:11px;
+}
+
+.info b{
+  display:block;
+  font-size:12px;
+  color:#667085;
+  margin-bottom:4px;
+}
+
+.info span{
+  font-size:14px;
+  font-weight:700;
+}
+
+.chart-wrap{
+  width:100%;
+  max-width:620px;
+  margin:15px auto 5px;
+}
+
+.chart{
+  width:100%;
+  height:auto;
+  display:block;
+  background:#fff;
+  border:1px solid #222;
+}
+
+.house-line{
+  fill:none;
+  stroke:#222;
+  stroke-width:2;
+}
+
+.house-number{
+  font-size:13px;
+  fill:#777;
+  text-anchor:middle;
+  dominant-baseline:middle;
+}
+
+.rashi-number{
+  font-size:19px;
+  font-weight:700;
+  fill:#7c3aed;
+  text-anchor:middle;
+  dominant-baseline:middle;
+}
+
+.rashi-name{
+  font-size:9px;
+  fill:#555;
+  text-anchor:middle;
+  dominant-baseline:middle;
+}
+
+.planet-text{
+  font-size:12px;
+  font-weight:700;
+  fill:#172033;
+  text-anchor:middle;
+  dominant-baseline:middle;
+}
+
+.lagna-text{
+  font-size:11px;
+  font-weight:700;
+  fill:#b3261e;
+  text-anchor:middle;
+  dominant-baseline:middle;
+}
+
+.table-wrap{
+  overflow-x:auto;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+
+th,
+td{
+  border-bottom:1px solid #e8eaf0;
+  padding:10px 7px;
+  text-align:left;
+  white-space:nowrap;
+}
+
+th{
+  background:#f6f7fa;
+  font-size:12px;
+}
+
+/* =====================================================
+   DASHA
+===================================================== */
+
+.dasha-title{
+  margin-bottom:5px;
+}
+
+.dasha-help{
+  font-size:12px;
+  color:#667085;
+  margin-bottom:12px;
+  line-height:1.5;
+}
+
+.dasha-item{
+  border:1px solid #dfe3ea;
+  border-radius:13px;
+  margin:8px 0;
+  overflow:hidden;
+  background:#fff;
+}
+
+.dasha-head{
+  width:100%;
+  min-height:58px;
+  margin:0;
+  padding:10px 12px;
+  background:#fafaff;
+  color:#172033;
+  border:0;
+  border-radius:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  text-align:left;
+  cursor:pointer;
+}
+
+.dasha-head:hover{
+  background:#f5f3ff;
+}
+
+.dasha-left{
+  min-width:0;
+}
+
+.dasha-lord{
+  font-size:15px;
+  font-weight:700;
+}
+
+.dasha-date{
+  margin-top:4px;
+  font-size:11px;
+  color:#667085;
+}
+
+.arrow{
+  font-size:20px;
+  transition:transform .2s;
+  flex-shrink:0;
+}
+
+.dasha-item.open > .dasha-head .arrow{
+  transform:rotate(90deg);
+}
+
+.dasha-body{
+  display:none;
+  padding:0 9px 9px;
+  background:#fff;
+}
+
+.dasha-item.open > .dasha-body{
+  display:block;
+}
+
+.antar-item{
+  border:1px solid #e4e6ec;
+  border-radius:10px;
+  margin-top:7px;
+  overflow:hidden;
+}
+
+.antar-head{
+  width:100%;
+  min-height:50px;
+  margin:0;
+  padding:8px 10px;
+  background:#f8f9fc;
+  color:#172033;
+  border:0;
+  border-radius:0;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  text-align:left;
+  cursor:pointer;
+}
+
+.antar-head:hover{
+  background:#f3f4f8;
+}
+
+.antar-left{
+  min-width:0;
+}
+
+.antar-lord{
+  font-size:13px;
+  font-weight:700;
+}
+
+.antar-date{
+  margin-top:3px;
+  color:#667085;
+  font-size:10px;
+}
+
+.antar-body{
+  display:none;
+  padding:7px;
+  background:#fff;
+}
+
+.antar-item.open > .antar-body{
+  display:block;
+}
+
+.pratyantar-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  padding:8px 9px;
+  border-bottom:1px solid #edf0f4;
+  font-size:11px;
+}
+
+.pratyantar-item:last-child{
+  border-bottom:0;
+}
+
+.pratyantar-lord{
+  font-weight:700;
+}
+
+.pratyantar-date{
+  color:#667085;
+  text-align:right;
+  white-space:nowrap;
+}
+
+.empty{
+  padding:15px;
+  border-radius:10px;
+  background:#f7f8fb;
+  color:#667085;
+  font-size:13px;
+}
+
+.error{
+  color:#b3261e;
+}
+
+.back{
+  display:inline-block;
+  text-decoration:none;
+  color:#fff;
+  background:#7c3aed;
+  padding:10px 15px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:700;
+  margin-bottom:15px;
+}
+
+.note{
+  margin-top:10px;
+  font-size:11px;
+  line-height:1.5;
+  color:#667085;
+}
+
+@media(max-width:600px){
+
+  body{
+    padding:8px;
+  }
+
+  .card{
+    padding:13px;
+    border-radius:15px;
+  }
+
+  .info-grid{
+    grid-template-columns:1fr;
+  }
+
+  h1{
+    font-size:21px;
+  }
+
+  h2{
+    font-size:18px;
+  }
+
+  .planet-text{
+    font-size:11px;
+  }
+
+  .rashi-number{
+    font-size:17px;
+  }
+
+  .dasha-lord{
+    font-size:14px;
+  }
+
+  .pratyantar-item{
+    flex-direction:column;
+    align-items:flex-start;
+  }
+
+  .pratyantar-date{
+    text-align:left;
+  }
+
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+<a class="back" href="/kundli.html">
+← नई Kundli बनाएँ
+</a>
+
+<div class="card">
+
+<h1>🔱 Study Mantra Kundli</h1>
+
+<div id="personSubtitle" class="sub">
+Kundli details
+</div>
+
+</div>
 
 
-# =========================================================
-# HELPERS
-# =========================================================
+<!-- =====================================================
+     BASIC INFORMATION
+===================================================== -->
 
-def norm360(value):
-    return float(value) % 360.0
+<div class="card">
 
+<h2>जन्म विवरण</h2>
 
-def sign_index(longitude):
-    return int(norm360(longitude) // 30)
+<div id="personInfo" class="info-grid"></div>
 
-
-def sign_name(longitude):
-    return SIGNS[sign_index(longitude)]
+</div>
 
 
-def planet_result(jd, planet_id, flags):
-    """
-    Compatible with different pyswisseph return formats.
-    """
+<!-- =====================================================
+     D1 CHART
+===================================================== -->
 
-    result = swe.calc_ut(
-        jd,
-        planet_id,
-        flags
-    )
+<div class="card">
 
-    if isinstance(result, tuple):
-        return result[0]
+<h2>राशि कुंडली — D1</h2>
 
-    return result
+<div class="sub">
+North Indian Style • Lahiri
+</div>
 
+<div class="chart-wrap">
 
-def get_ayanamsha(jd):
-    """
-    Get Lahiri ayanamsha.
-    """
+<svg
+ id="d1Chart"
+ class="chart"
+ viewBox="0 0 600 600"
+ xmlns="http://www.w3.org/2000/svg"
+ aria-label="D1 Kundli"
+></svg>
 
-    try:
-        return float(
-            swe.get_ayanamsa_ut(jd)
-        )
-    except Exception:
+</div>
 
-        try:
-            return float(
-                swe.get_ayanamsa(jd)
-            )
-        except Exception:
-            return 0.0
+</div>
 
 
-def tropical_to_sidereal(
-    longitude,
-    ayanamsha
-):
-    return norm360(
-        longitude - ayanamsha
-    )
+<!-- =====================================================
+     D9 CHART
+===================================================== -->
+
+<div class="card">
+
+<h2>नवांश कुंडली — D9</h2>
+
+<div class="sub">
+Navamsa Chart
+</div>
+
+<div class="chart-wrap">
+
+<svg
+ id="d9Chart"
+ class="chart"
+ viewBox="0 0 600 600"
+ xmlns="http://www.w3.org/2000/svg"
+ aria-label="D9 Kundli"
+></svg>
+
+</div>
+
+</div>
 
 
-def add_years(
-    date_time,
-    years
-):
-    return date_time + datetime.timedelta(
-        days=float(years) * YEAR_DAYS
-    )
+<!-- =====================================================
+     BASIC ASTROLOGY
+===================================================== -->
+
+<div class="card">
+
+<h2>मुख्य जानकारी</h2>
+
+<div id="basicInfo" class="info-grid"></div>
+
+</div>
 
 
-# =========================================================
-# HOUSE / ASCENDANT
-# =========================================================
+<!-- =====================================================
+     PLANETS
+===================================================== -->
 
-def calculate_houses(
-    jd,
-    latitude,
-    longitude
-):
-    """
-    Use swe.houses().
+<div class="card">
 
-    This keeps compatibility with pyswisseph versions
-    where houses_ex() may return different structures.
-    """
+<h2>ग्रह स्थिति</h2>
 
-    result = swe.houses(
-        float(jd),
-        float(latitude),
-        float(longitude),
-        b"P"
-    )
+<div class="table-wrap">
 
-    if not isinstance(result, tuple):
-        raise RuntimeError(
-            "Swiss Ephemeris houses() returned an unexpected result."
-        )
+<table>
 
-    if len(result) < 2:
-        raise RuntimeError(
-            "Swiss Ephemeris houses() returned incomplete house data."
-        )
+<thead>
 
-    cusps = result[0]
-    ascmc = result[1]
+<tr>
+<th>ग्रह</th>
+<th>राशि</th>
+<th>डिग्री</th>
+<th>भाव</th>
+</tr>
 
-    if len(ascmc) < 1:
-        raise RuntimeError(
-            "Swiss Ephemeris did not return Ascendant data."
-        )
+</thead>
 
-    tropical_asc = norm360(
-        float(ascmc[0])
-    )
+<tbody id="planetTable"></tbody>
 
-    ayanamsha = get_ayanamsha(
-        jd
-    )
+</table>
 
-    sidereal_asc = tropical_to_sidereal(
-        tropical_asc,
-        ayanamsha
-    )
+</div>
 
-    return {
-        "cusps": cusps,
-        "ascendant": sidereal_asc,
-        "ayanamsha": ayanamsha,
+</div>
+
+
+<!-- =====================================================
+     VIMSHOTTARI DASHA
+===================================================== -->
+
+<div class="card">
+
+<h2 class="dasha-title">
+विम्शोत्तरी महादशा
+</h2>
+
+<div class="dasha-help">
+किसी Mahadasha पर tap करें → Antardasha देखें।
+फिर Antardasha पर tap करें → Pratyantardasha देखें।
+</div>
+
+<div id="dashaContainer">
+
+<div class="empty">
+दशा डेटा लोड हो रहा है...
+</div>
+
+</div>
+
+<div class="note">
+दशा गणना जन्म समय, स्थान, Lahiri sidereal Moon और Vimshottari system पर आधारित है।
+</div>
+
+</div>
+
+
+<!-- =====================================================
+     ERROR
+===================================================== -->
+
+<div
+ id="pageError"
+ class="card error"
+ style="display:none"
+></div>
+
+
+</div>
+
+
+<script>
+
+/* ========================================================
+   CONSTANTS
+======================================================== */
+
+const SIGNS = [
+  "Aries",
+  "Taurus",
+  "Gemini",
+  "Cancer",
+  "Leo",
+  "Virgo",
+  "Libra",
+  "Scorpio",
+  "Sagittarius",
+  "Capricorn",
+  "Aquarius",
+  "Pisces"
+];
+
+const SIGNS_HI = [
+  "मेष",
+  "वृषभ",
+  "मिथुन",
+  "कर्क",
+  "सिंह",
+  "कन्या",
+  "तुला",
+  "वृश्चिक",
+  "धनु",
+  "मकर",
+  "कुंभ",
+  "मीन"
+];
+
+const PLANET_HI = {
+  Sun:"सूर्य",
+  Moon:"चंद्र",
+  Mars:"मंगल",
+  Mercury:"बुध",
+  Jupiter:"गुरु",
+  Venus:"शुक्र",
+  Saturn:"शनि",
+  Rahu:"राहु",
+  Ketu:"केतु"
+};
+
+const DASHA_HI = {
+  Ketu:"केतु",
+  Venus:"शुक्र",
+  Sun:"सूर्य",
+  Moon:"चंद्र",
+  Mars:"मंगल",
+  Rahu:"राहु",
+  Jupiter:"गुरु",
+  Saturn:"शनि",
+  Mercury:"बुध"
+};
+
+
+/* ========================================================
+   HELPERS
+======================================================== */
+
+function $(id){
+  return document.getElementById(id);
+}
+
+
+function escapeHtml(value){
+
+  return String(value ?? "")
+    .replace(/&/g,"&amp;")
+    .replace(/</g,"&lt;")
+    .replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;")
+    .replace(/'/g,"&#039;");
+
+}
+
+
+function number(value){
+
+  const n = Number(value);
+
+  return Number.isFinite(n) ? n : 0;
+
+}
+
+
+function formatDegree(value){
+
+  return number(value).toFixed(2) + "°";
+
+}
+
+
+function formatDate(value){
+
+  if(!value){
+    return "-";
+  }
+
+  try{
+
+    const d = new Date(value);
+
+    if(Number.isNaN(d.getTime())){
+      return String(value);
     }
 
+    return d.toLocaleDateString(
+      "en-IN",
+      {
+        day:"2-digit",
+        month:"short",
+        year:"numeric"
+      }
+    );
 
-# =========================================================
-# NAKSHATRA
-# =========================================================
+  }catch(e){
 
-def calculate_nakshatra(
-    moon_longitude
-):
-    nakshatra_span = 360.0 / 27.0
+    return String(value);
 
-    moon_longitude = norm360(
-        moon_longitude
+  }
+
+}
+
+
+function planetName(name){
+
+  return DASHA_HI[name] || name || "-";
+
+}
+
+
+function signNumber(value){
+
+  const n = Number(value);
+
+  if(Number.isFinite(n)){
+
+    if(n >= 0 && n <= 11){
+      return n;
+    }
+
+  }
+
+  return 0;
+
+}
+
+
+/* ========================================================
+   NORTH INDIAN HOUSE GEOMETRY
+======================================================== */
+
+function getHousePolygons(){
+
+  return [
+
+    "300,0 450,150 300,300 150,150",
+
+    "0,0 300,0 150,150",
+
+    "0,0 150,150 0,300",
+
+    "0,300 150,150 300,300 150,450",
+
+    "0,300 150,450 0,600",
+
+    "0,600 150,450 300,600",
+
+    "150,450 300,300 450,450 300,600",
+
+    "300,600 450,450 600,600",
+
+    "600,600 450,450 600,300",
+
+    "600,300 450,150 300,300 450,450",
+
+    "600,300 450,150 600,0",
+
+    "600,0 300,0 450,150"
+
+  ];
+
+}
+
+
+function getHouseCenters(){
+
+  return [
+
+    {x:300,y:150},
+    {x:150,y:75},
+    {x:65,y:215},
+    {x:150,y:300},
+    {x:65,y:385},
+    {x:150,y:525},
+    {x:300,y:450},
+    {x:450,y:525},
+    {x:535,y:385},
+    {x:450,y:300},
+    {x:535,y:215},
+    {x:450,y:75}
+
+  ];
+
+}
+
+
+/* ========================================================
+   SVG HELPERS
+======================================================== */
+
+function svgElement(
+  tag,
+  attrs
+){
+
+  const el =
+    document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      tag
+    );
+
+  Object.keys(attrs || {}).forEach(
+    key => {
+
+      el.setAttribute(
+        key,
+        attrs[key]
+      );
+
+    }
+  );
+
+  return el;
+
+}
+
+
+function addText(
+  svg,
+  text,
+  x,
+  y,
+  className
+){
+
+  const el =
+    svgElement(
+      "text",
+      {
+        x:x,
+        y:y,
+        class:className
+      }
+    );
+
+  el.textContent = text;
+
+  svg.appendChild(el);
+
+  return el;
+
+}
+
+
+/* ========================================================
+   D1 HOUSE DATA
+======================================================== */
+
+function buildD1Houses(data){
+
+  const houses =
+    Array.from(
+      {length:12},
+      () => ({
+        planets:[]
+      })
+    );
+
+  const asc =
+    data &&
+    data.lagna
+      ? signNumber(data.lagna.sign)
+      : 0;
+
+
+  const planets =
+    Array.isArray(data.planets)
+      ? data.planets
+      : [];
+
+
+  planets.forEach(
+    planet => {
+
+      let house =
+        Number(planet.house);
+
+      if(
+        !Number.isFinite(house) ||
+        house < 1 ||
+        house > 12
+      ){
+
+        const sign =
+          signNumber(planet.sign);
+
+        house =
+          ((sign - asc + 12) % 12) + 1;
+
+      }
+
+      houses[house - 1]
+        .planets
+        .push(planet);
+
+    }
+  );
+
+
+  return {
+    ascendantSign:asc,
+    houses:houses
+  };
+
+}
+
+
+/* ========================================================
+   D9 HOUSE DATA
+======================================================== */
+
+function buildD9Houses(data){
+
+  const houses =
+    Array.from(
+      {length:12},
+      () => ({
+        planets:[]
+      })
+    );
+
+
+  const d9 =
+    data &&
+    data.d9 &&
+    Array.isArray(data.d9.planets)
+      ? data.d9.planets
+      : [];
+
+
+  let ascD9 = 0;
+
+
+  if(
+    data &&
+    data.lagna &&
+    Number.isFinite(
+      Number(data.lagna.longitude)
     )
+  ){
 
-    index = int(
-        moon_longitude / nakshatra_span
+    const lon =
+      Number(
+        data.lagna.longitude
+      );
+
+    const normalized =
+      ((lon % 360) + 360) % 360;
+
+    const sign =
+      Math.floor(
+        normalized / 30
+      );
+
+    const deg =
+      normalized % 30;
+
+    const part =
+      Math.min(
+        8,
+        Math.floor(
+          deg / (30 / 9)
+        )
+      );
+
+    ascD9 =
+      (sign * 9 + part) % 12;
+
+  }
+
+
+  d9.forEach(
+    planet => {
+
+      const sign =
+        signNumber(
+          planet.sign
+        );
+
+      const house =
+        ((sign - ascD9 + 12) % 12) + 1;
+
+      houses[house - 1]
+        .planets
+        .push(planet);
+
+    }
+  );
+
+
+  return {
+    ascendantSign:ascD9,
+    houses:houses
+  };
+
+}
+
+
+/* ========================================================
+   DRAW CHART
+======================================================== */
+
+function drawChart(
+  svgId,
+  data,
+  isD9
+){
+
+  const svg =
+    $(svgId);
+
+  if(!svg){
+    return;
+  }
+
+
+  svg.innerHTML = "";
+
+
+  const geometry =
+    isD9
+      ? buildD9Houses(data)
+      : buildD1Houses(data);
+
+
+  const polygons =
+    getHousePolygons();
+
+  const centers =
+    getHouseCenters();
+
+
+  svg.appendChild(
+    svgElement(
+      "rect",
+      {
+        x:0,
+        y:0,
+        width:600,
+        height:600,
+        fill:"white",
+        stroke:"#222",
+        "stroke-width":"2"
+      }
     )
+  );
 
-    if index < 0:
-        index = 0
 
-    if index > 26:
-        index = 26
+  polygons.forEach(
+    (points,index) => {
 
-    inside = (
-        moon_longitude
-        - index * nakshatra_span
+      svg.appendChild(
+        svgElement(
+          "polygon",
+          {
+            points:points,
+            class:"house-line"
+          }
+        )
+      );
+
+      addText(
+        svg,
+        "H" + (index + 1),
+        centers[index].x,
+        centers[index].y - 34,
+        "house-number"
+      );
+
+    }
+  );
+
+
+  /* Rashi */
+
+  for(
+    let house = 1;
+    house <= 12;
+    house++
+  ){
+
+    const sign =
+      (
+        geometry.ascendantSign
+        + house
+        - 1
+      ) % 12;
+
+
+    const c =
+      centers[house - 1];
+
+
+    addText(
+      svg,
+      String(sign + 1),
+      c.x,
+      c.y - 12,
+      "rashi-number"
+    );
+
+
+    addText(
+      svg,
+      SIGNS_HI[sign],
+      c.x,
+      c.y + 6,
+      "rashi-name"
+    );
+
+  }
+
+
+  /* Planets */
+
+  geometry.houses.forEach(
+    (houseData,index) => {
+
+      if(
+        !houseData ||
+        !Array.isArray(
+          houseData.planets
+        )
+      ){
+        return;
+      }
+
+
+      const planets =
+        houseData.planets;
+
+
+      const c =
+        centers[index];
+
+
+      planets.forEach(
+        (planet,pIndex) => {
+
+          const row =
+            Math.floor(
+              pIndex / 2
+            );
+
+          const col =
+            pIndex % 2;
+
+
+          let x =
+            c.x - 27 + col * 54;
+
+          let y =
+            c.y + 24 + row * 15;
+
+
+          x =
+            Math.max(
+              20,
+              Math.min(
+                580,
+                x
+              )
+            );
+
+
+          y =
+            Math.max(
+              15,
+              Math.min(
+                585,
+                y
+              )
+            );
+
+
+          const label =
+            PLANET_HI[
+              planet.name
+            ] ||
+            planet.name ||
+            "";
+
+
+          addText(
+            svg,
+            label,
+            x,
+            y,
+            "planet-text"
+          );
+
+        }
+      );
+
+    }
+  );
+
+
+  /* Lagna */
+
+  const firstCenter =
+    centers[0];
+
+
+  addText(
+    svg,
+    "लग्न",
+    firstCenter.x,
+    firstCenter.y + 39,
+    "lagna-text"
+  );
+
+}
+
+
+/* ========================================================
+   PERSON INFO
+======================================================== */
+
+function renderPersonInfo(data){
+
+  const input =
+    data &&
+    data.input
+      ? data.input
+      : {};
+
+
+  $("personSubtitle").textContent =
+    (
+      input.name ||
+      "Kundli"
     )
+    +
+    " • "
+    +
+    (
+      input.place ||
+      ""
+    );
 
-    fraction = (
-        inside / nakshatra_span
-    )
 
-    pada = int(
-        fraction * 4
-    ) + 1
+  const items = [
 
-    if pada < 1:
-        pada = 1
+    [
+      "नाम",
+      input.name || "-"
+    ],
 
-    if pada > 4:
-        pada = 4
+    [
+      "जन्म तारीख",
+      input.date || "-"
+    ],
 
-    lord = DASHA_LORDS[
-        index % 9
+    [
+      "जन्म समय",
+      input.time || "-"
+    ],
+
+    [
+      "जन्म स्थान",
+      input.place || "-"
+    ],
+
+    [
+      "Latitude",
+      Number.isFinite(Number(input.lat))
+        ? Number(input.lat).toFixed(5)
+        : "-"
+    ],
+
+    [
+      "Longitude",
+      Number.isFinite(Number(input.lon))
+        ? Number(input.lon).toFixed(5)
+        : "-"
+    ],
+
+    [
+      "Timezone",
+      input.timezone || "-"
     ]
 
-    return {
-        "name": NAKSHATRAS[index],
-        "number": index + 1,
-        "pada": pada,
-        "lord": lord,
-        "longitude": moon_longitude,
-    }
+  ];
 
 
-# =========================================================
-# NAVAMSA / D9
-# =========================================================
+  $("personInfo").innerHTML =
+    items.map(
+      item =>
 
-def calculate_navamsa(
-    planet
-):
+        '<div class="info">' +
 
-    longitude = norm360(
-        planet["longitude"]
-    )
+        "<b>" +
+        escapeHtml(item[0]) +
+        "</b>" +
 
-    sign = int(
-        longitude // 30
-    )
+        "<span>" +
+        escapeHtml(item[1]) +
+        "</span>" +
 
-    degree = (
-        longitude % 30
-    )
+        "</div>"
 
-    navamsa_part = int(
-        degree / (30.0 / 9.0)
-    )
+    ).join("");
 
-    if navamsa_part < 0:
-        navamsa_part = 0
-
-    if navamsa_part > 8:
-        navamsa_part = 8
-
-    d9_sign = (
-        sign * 9
-        + navamsa_part
-    ) % 12
-
-    d9_degree = (
-        degree % (30.0 / 9.0)
-    ) * 9.0
-
-    d9_longitude = norm360(
-        d9_sign * 30
-        + d9_degree
-    )
-
-    return {
-        "name": planet["name"],
-        "longitude": d9_longitude,
-        "sign": d9_sign,
-        "sign_name": SIGNS[d9_sign],
-        "degree": d9_degree,
-    }
+}
 
 
-# =========================================================
-# DASHA - PRATYANTARDASHA
-# =========================================================
+/* ========================================================
+   BASIC INFO
+======================================================== */
 
-def calculate_pratyantardasha(
-    antar_lord,
-    antar_start,
-    antar_end
-):
-    """
-    9 Pratyantardasha periods inside one Antardasha.
+function renderBasicInfo(data){
 
-    Sequence starts from the Antardasha lord.
-    """
+  const lagna =
+    data &&
+    data.lagna
+      ? data.lagna
+      : {};
 
-    total_seconds = (
-        antar_end - antar_start
-    ).total_seconds()
 
-    if total_seconds <= 0:
-        return []
+  const nak =
+    data &&
+    data.nakshatra
+      ? data.nakshatra
+      : {};
 
-    periods = []
 
-    start_index = DASHA_LORDS.index(
-        antar_lord
-    )
+  const astronomy =
+    data &&
+    data.astronomy
+      ? data.astronomy
+      : {};
 
-    current = antar_start
 
-    for i in range(9):
+  const items = [
 
-        lord = DASHA_LORDS[
-            (start_index + i) % 9
-        ]
-
-        proportion = (
-            DASHA_YEARS[lord]
-            / TOTAL_DASHA_YEARS
+    [
+      "लग्न",
+      lagna.sign_name ||
+      (
+        Number.isFinite(
+          Number(lagna.sign)
         )
+        ? SIGNS[
+            signNumber(lagna.sign)
+          ]
+        : "-"
+      )
+    ],
 
-        duration_seconds = (
-            total_seconds
-            * proportion
+    [
+      "लग्न डिग्री",
+      formatDegree(
+        lagna.degree
+      )
+    ],
+
+    [
+      "नक्षत्र",
+      nak.name || "-"
+    ],
+
+    [
+      "नक्षत्र पाद",
+      nak.pada
+        ? String(nak.pada)
+        : "-"
+    ],
+
+    [
+      "नक्षत्र स्वामी",
+      nak.lord
+        ? planetName(nak.lord)
+        : "-"
+    ],
+
+    [
+      "Ayanamsha",
+      Number.isFinite(
+        Number(
+          astronomy.ayanamsha
         )
-
-        end = (
-            current
-            + datetime.timedelta(
-                seconds=duration_seconds
-            )
-        )
-
-        periods.append({
-            "lord": lord,
-            "start": current.isoformat(),
-            "end": end.isoformat(),
-            "years": (
-                DASHA_YEARS[lord]
-                * (
-                    (
-                        antar_end
-                        - antar_start
-                    ).total_seconds()
-                    / 86400.0
-                )
-                / YEAR_DAYS
-                / TOTAL_DASHA_YEARS
-            ),
-        })
-
-        current = end
-
-    # Make sure final end is exact
-    if periods:
-        periods[-1]["end"] = (
-            antar_end.isoformat()
-        )
-
-    return periods
-
-
-# =========================================================
-# DASHA - ANTARDASHA
-# =========================================================
-
-def calculate_antardasha(
-    maha_lord,
-    maha_start,
-    maha_end
-):
-    """
-    9 Antardasha periods inside one Mahadasha.
-
-    Sequence starts from Mahadasha lord.
-    """
-
-    total_seconds = (
-        maha_end - maha_start
-    ).total_seconds()
-
-    if total_seconds <= 0:
-        return []
-
-    periods = []
-
-    start_index = DASHA_LORDS.index(
-        maha_lord
-    )
-
-    current = maha_start
-
-    maha_years = (
-        DASHA_YEARS[maha_lord]
-    )
-
-    for i in range(9):
-
-        lord = DASHA_LORDS[
-            (start_index + i) % 9
-        ]
-
-        proportion = (
-            DASHA_YEARS[lord]
-            / TOTAL_DASHA_YEARS
-        )
-
-        duration_seconds = (
-            total_seconds
-            * proportion
-        )
-
-        end = (
-            current
-            + datetime.timedelta(
-                seconds=duration_seconds
-            )
-        )
-
-        # Antardasha duration in years
-        antar_years = (
-            maha_years
-            * DASHA_YEARS[lord]
-            / TOTAL_DASHA_YEARS
-        )
-
-        # Pratyantardasha
-        pratyantar = (
-            calculate_pratyantardasha(
-                lord,
-                current,
-                end
-            )
-        )
-
-        periods.append({
-            "lord": lord,
-            "start": current.isoformat(),
-            "end": end.isoformat(),
-            "years": antar_years,
-            "pratyantardasha": pratyantar,
-        })
-
-        current = end
-
-    # Exact final boundary
-    if periods:
-        periods[-1]["end"] = (
-            maha_end.isoformat()
-        )
-
-        if periods[-1]["pratyantardasha"]:
-            periods[-1][
-                "pratyantardasha"
-            ][-1]["end"] = (
-                maha_end.isoformat()
-            )
-
-    return periods
-
-
-# =========================================================
-# VIMSHOTTARI MAHADASHA
-# =========================================================
-
-def calculate_vimshottari(
-    moon_longitude,
-    birth_local
-):
-    """
-    Vimshottari Dasha based on sidereal Moon longitude.
-
-    Returns:
-
-        Mahadasha
-          └── Antardasha
-                └── Pratyantardasha
-    """
-
-    moon_longitude = norm360(
-        moon_longitude
-    )
-
-    nakshatra_span = (
-        360.0 / 27.0
-    )
-
-    nak_index = int(
-        moon_longitude
-        / nakshatra_span
-    )
-
-    if nak_index < 0:
-        nak_index = 0
-
-    if nak_index > 26:
-        nak_index = 26
-
-    inside_nakshatra = (
-        moon_longitude
-        - nak_index * nakshatra_span
-    )
-
-    fraction_completed = (
-        inside_nakshatra
-        / nakshatra_span
-    )
-
-    first_lord = DASHA_LORDS[
-        nak_index % 9
+      )
+      ? Number(
+          astronomy.ayanamsha
+        ).toFixed(6) + "°"
+      : "-"
     ]
 
-    first_total_years = (
-        DASHA_YEARS[first_lord]
-    )
+  ];
 
-    elapsed_years = (
-        fraction_completed
-        * first_total_years
-    )
 
-    remaining_years = (
-        first_total_years
-        - elapsed_years
-    )
+  $("basicInfo").innerHTML =
+    items.map(
+      item =>
 
-    # First Mahadasha starts before birth.
-    first_start = (
-        birth_local
-        - datetime.timedelta(
-            days=(
-                elapsed_years
-                * YEAR_DAYS
+        '<div class="info">' +
+
+        "<b>" +
+        escapeHtml(item[0]) +
+        "</b>" +
+
+        "<span>" +
+        escapeHtml(item[1]) +
+        "</span>" +
+
+        "</div>"
+
+    ).join("");
+
+}
+
+
+/* ========================================================
+   PLANET TABLE
+======================================================== */
+
+function renderPlanetTable(data){
+
+  const planets =
+    data &&
+    Array.isArray(data.planets)
+      ? data.planets
+      : [];
+
+
+  if(!planets.length){
+
+    $("planetTable").innerHTML =
+      '<tr><td colspan="4">Planet data उपलब्ध नहीं है।</td></tr>';
+
+    return;
+
+  }
+
+
+  $("planetTable").innerHTML =
+    planets.map(
+      planet => {
+
+        const sign =
+          planet.sign_name ||
+          SIGNS[
+            signNumber(
+              planet.sign
             )
+          ];
+
+
+        return (
+
+          "<tr>" +
+
+          "<td>" +
+          escapeHtml(
+            PLANET_HI[
+              planet.name
+            ] ||
+            planet.name
+          ) +
+          "</td>" +
+
+          "<td>" +
+          escapeHtml(sign) +
+          "</td>" +
+
+          "<td>" +
+          escapeHtml(
+            formatDegree(
+              planet.degree
+            )
+          ) +
+          "</td>" +
+
+          "<td>" +
+          escapeHtml(
+            planet.house || "-"
+          ) +
+          "</td>" +
+
+          "</tr>"
+
+        );
+
+      }
+    ).join("");
+
+}
+
+
+/* ========================================================
+   DASHA DATA NORMALIZER
+======================================================== */
+
+function getMahadashaArray(data){
+
+  if(
+    !data ||
+    !data.vimshottari
+  ){
+    return [];
+  }
+
+
+  const v =
+    data.vimshottari;
+
+
+  if(
+    Array.isArray(
+      v.mahadasha
+    )
+  ){
+    return v.mahadasha;
+  }
+
+
+  if(
+    Array.isArray(
+      v.periods
+    )
+  ){
+    return v.periods;
+  }
+
+
+  if(
+    Array.isArray(
+      v.dashas
+    )
+  ){
+    return v.dashas;
+  }
+
+
+  return [];
+
+}
+
+
+function getAntardashaArray(maha){
+
+  if(!maha){
+    return [];
+  }
+
+
+  if(
+    Array.isArray(
+      maha.antardasha
+    )
+  ){
+    return maha.antardasha;
+  }
+
+
+  if(
+    Array.isArray(
+      maha.antardashas
+    )
+  ){
+    return maha.antardashas;
+  }
+
+
+  if(
+    Array.isArray(
+      maha.antar
+    )
+  ){
+    return maha.antar;
+  }
+
+
+  return [];
+
+}
+
+
+function getPratyantarArray(antar){
+
+  if(!antar){
+    return [];
+  }
+
+
+  if(
+    Array.isArray(
+      antar.pratyantardasha
+    )
+  ){
+    return antar.pratyantardasha;
+  }
+
+
+  if(
+    Array.isArray(
+      antar.pratyantardashas
+    )
+  ){
+    return antar.pratyantardashas;
+  }
+
+
+  if(
+    Array.isArray(
+      antar.pratyantar
+    )
+  ){
+    return antar.pratyantar;
+  }
+
+
+  return [];
+
+}
+
+
+/* ========================================================
+   CREATE PRATYANTAR
+======================================================== */
+
+function createPratyantarRow(
+  period
+){
+
+  const row =
+    document.createElement(
+      "div"
+    );
+
+  row.className =
+    "pratyantar-item";
+
+
+  const name =
+    document.createElement(
+      "div"
+    );
+
+  name.className =
+    "pratyantar-lord";
+
+
+  name.textContent =
+    dashaPlanetName(
+      period.lord
+    )
+    +
+    (
+      period.lord
+        ? " (" + period.lord + ")"
+        : ""
+    );
+
+
+  const date =
+    document.createElement(
+      "div"
+    );
+
+  date.className =
+    "pratyantar-date";
+
+
+  date.textContent =
+    formatDate(
+      period.start
+    )
+    +
+    " → "
+    +
+    formatDate(
+      period.end
+    );
+
+
+  row.appendChild(name);
+  row.appendChild(date);
+
+
+  return row;
+
+}
+
+
+/* ========================================================
+   DASH PLANET NAME
+======================================================== */
+
+function dashaPlanetName(
+  lord
+){
+
+  return DASHA_HI[
+    lord
+  ] ||
+  lord ||
+  "-";
+
+}
+
+
+/* ========================================================
+   CREATE ANTARDASHA
+======================================================== */
+
+function createAntardashaElement(
+  antar
+){
+
+  const item =
+    document.createElement(
+      "div"
+    );
+
+  item.className =
+    "antar-item";
+
+
+  const head =
+    document.createElement(
+      "button"
+    );
+
+  head.type = "button";
+
+  head.className =
+    "antar-head";
+
+
+  const left =
+    document.createElement(
+      "div"
+    );
+
+  left.className =
+    "antar-left";
+
+
+  const lord =
+    document.createElement(
+      "div"
+    );
+
+  lord.className =
+    "antar-lord";
+
+
+  lord.textContent =
+    dashaPlanetName(
+      antar.lord
+    )
+    +
+    " Antardasha"
+    +
+    (
+      antar.lord
+        ? " (" + antar.lord + ")"
+        : ""
+    );
+
+
+  const date =
+    document.createElement(
+      "div"
+    );
+
+  date.className =
+    "antar-date";
+
+
+  date.textContent =
+    formatDate(
+      antar.start
+    )
+    +
+    " → "
+    +
+    formatDate(
+      antar.end
+    );
+
+
+  left.appendChild(lord);
+  left.appendChild(date);
+
+
+  const arrow =
+    document.createElement(
+      "span"
+    );
+
+  arrow.className =
+    "arrow";
+
+  arrow.textContent =
+    "›";
+
+
+  head.appendChild(left);
+  head.appendChild(arrow);
+
+
+  const body =
+    document.createElement(
+      "div"
+    );
+
+  body.className =
+    "antar-body";
+
+
+  const pratyantar =
+    getPratyantarArray(
+      antar
+    );
+
+
+  if(
+    !pratyantar.length
+  ){
+
+    const empty =
+      document.createElement(
+        "div"
+      );
+
+    empty.className =
+      "empty";
+
+    empty.textContent =
+      "Pratyantardasha data उपलब्ध नहीं है।";
+
+    body.appendChild(empty);
+
+  }else{
+
+    pratyantar.forEach(
+      period => {
+
+        body.appendChild(
+          createPratyantarRow(
+            period
+          )
+        );
+
+      }
+    );
+
+  }
+
+
+  head.addEventListener(
+    "click",
+    function(){
+
+      item.classList.toggle(
+        "open"
+      );
+
+    }
+  );
+
+
+  item.appendChild(head);
+  item.appendChild(body);
+
+
+  return item;
+
+}
+
+
+/* ========================================================
+   CREATE MAHADASHA
+======================================================== */
+
+function createMahadashaElement(
+  maha
+){
+
+  const item =
+    document.createElement(
+      "div"
+    );
+
+  item.className =
+    "dasha-item";
+
+
+  const head =
+    document.createElement(
+      "button"
+    );
+
+  head.type = "button";
+
+  head.className =
+    "dasha-head";
+
+
+  const left =
+    document.createElement(
+      "div"
+    );
+
+  left.className =
+    "dasha-left";
+
+
+  const lord =
+    document.createElement(
+      "div"
+    );
+
+  lord.className =
+    "dasha-lord";
+
+
+  lord.textContent =
+    dashaPlanetName(
+      maha.lord
+    )
+    +
+    " Mahadasha"
+    +
+    (
+      maha.lord
+        ? " (" + maha.lord + ")"
+        : ""
+    );
+
+
+  const date =
+    document.createElement(
+      "div"
+    );
+
+  date.className =
+    "dasha-date";
+
+
+  date.textContent =
+    formatDate(
+      maha.start
+    )
+    +
+    " → "
+    +
+    formatDate(
+      maha.end
+    );
+
+
+  left.appendChild(lord);
+  left.appendChild(date);
+
+
+  const arrow =
+    document.createElement(
+      "span"
+    );
+
+  arrow.className =
+    "arrow";
+
+  arrow.textContent =
+    "›";
+
+
+  head.appendChild(left);
+  head.appendChild(arrow);
+
+
+  const body =
+    document.createElement(
+      "div"
+    );
+
+  body.className =
+    "dasha-body";
+
+
+  const antardasha =
+    getAntardashaArray(
+      maha
+    );
+
+
+  if(
+    !antardasha.length
+  ){
+
+    const empty =
+      document.createElement(
+        "div"
+      );
+
+    empty.className =
+      "empty";
+
+    empty.textContent =
+      "इस Mahadasha का Antardasha data उपलब्ध नहीं है।";
+
+    body.appendChild(empty);
+
+  }else{
+
+    antardasha.forEach(
+      antar => {
+
+        body.appendChild(
+          createAntardashaElement(
+            antar
+          )
+        );
+
+      }
+    );
+
+  }
+
+
+  head.addEventListener(
+    "click",
+    function(){
+
+      item.classList.toggle(
+        "open"
+      );
+
+    }
+  );
+
+
+  item.appendChild(head);
+  item.appendChild(body);
+
+
+  return item;
+
+}
+
+
+/* ========================================================
+   RENDER DASHA
+======================================================== */
+
+function renderDasha(
+  data
+){
+
+  const container =
+    $("dashaContainer");
+
+
+  if(!container){
+    return;
+  }
+
+
+  container.innerHTML =
+    "";
+
+
+  const mahadasha =
+    getMahadashaArray(
+      data
+    );
+
+
+  if(
+    !Array.isArray(mahadasha) ||
+    mahadasha.length === 0
+  ){
+
+    const empty =
+      document.createElement(
+        "div"
+      );
+
+    empty.className =
+      "empty";
+
+    empty.textContent =
+      "Mahadasha data उपलब्ध नहीं है।";
+
+    container.appendChild(
+      empty
+    );
+
+    return;
+
+  }
+
+
+  mahadasha.forEach(
+    maha => {
+
+      if(
+        !maha ||
+        typeof maha !== "object"
+      ){
+        return;
+      }
+
+
+      container.appendChild(
+        createMahadashaElement(
+          maha
         )
-    )
+      );
 
-    periods = []
+    }
+  );
 
-    current = first_start
 
-    first_index = DASHA_LORDS.index(
-        first_lord
-    )
+  if(
+    !container.children.length
+  ){
 
-    for i in range(9):
+    const empty =
+      document.createElement(
+        "div"
+      );
 
-        lord = DASHA_LORDS[
-            (first_index + i) % 9
-        ]
+    empty.className =
+      "empty";
 
-        if i == 0:
+    empty.textContent =
+      "Dasha data पढ़ा नहीं जा सका।";
 
-            duration_years = (
-                remaining_years
-            )
+    container.appendChild(
+      empty
+    );
 
-        else:
+  }
 
-            duration_years = (
-                DASHA_YEARS[lord]
-            )
+}
 
-        end = add_years(
-            current,
-            duration_years
-        )
 
-        antardasha = (
-            calculate_antardasha(
-                lord,
-                current,
-                end
-            )
-        )
+/* ========================================================
+   LOAD DATA
+======================================================== */
 
-        periods.append({
-            "lord": lord,
-            "start": current.isoformat(),
-            "end": end.isoformat(),
-            "years": duration_years,
-            "antardasha": antardasha,
-        })
+function loadKundli(){
 
-        current = end
+  let raw = null;
 
-    return {
-        "system": "Vimshottari",
 
-        "total_years": 120,
+  try{
 
-        "starting_lord": first_lord,
+    raw =
+      localStorage.getItem(
+        "studyMantraLastKundli"
+      );
 
-        "mahadasha": periods,
+  }catch(error){
+
+    console.error(
+      "localStorage error",
+      error
+    );
+
+  }
+
+
+  if(!raw){
+
+    showPageError(
+      "Kundli data नहीं मिला। पहले Kundli calculate करें।"
+    );
+
+    return null;
+
+  }
+
+
+  try{
+
+    const data =
+      JSON.parse(
+        raw
+      );
+
+
+    if(
+      !data ||
+      typeof data !== "object"
+    ){
+
+      throw new Error(
+        "Invalid Kundli data"
+      );
+
     }
 
 
-# =========================================================
-# MAIN KUNDLI CALCULATION
-# =========================================================
+    return data;
 
-def calculate_kundli(
-    payload
-):
+  }catch(error){
 
-    # -----------------------------------------------------
-    # INPUT
-    # -----------------------------------------------------
+    console.error(
+      error
+    );
 
-    date_string = str(
-        payload.get(
-            "date",
-            ""
-        )
-    ).strip()
-
-    time_string = str(
-        payload.get(
-            "time",
-            ""
-        )
-    ).strip()
-
-    if not date_string:
-        raise ValueError(
-            "Birth date is required."
-        )
-
-    if not time_string:
-        raise ValueError(
-            "Birth time is required."
-        )
-
-    try:
-
-        latitude = float(
-            payload.get("lat")
-        )
-
-        longitude = float(
-            payload.get("lon")
-        )
-
-    except Exception:
-
-        raise ValueError(
-            "Valid latitude and longitude are required."
-        )
-
-    if not -90 <= latitude <= 90:
-
-        raise ValueError(
-            "Latitude must be between -90 and 90."
-        )
-
-    if not -180 <= longitude <= 180:
-
-        raise ValueError(
-            "Longitude must be between -180 and 180."
-        )
-
-    timezone_name = (
-        payload.get("timezone")
-        or "Asia/Kolkata"
-    )
-
-    # -----------------------------------------------------
-    # DATE / TIME
-    # -----------------------------------------------------
-
-    try:
-
-        birth_date = (
-            datetime.date.fromisoformat(
-                date_string
-            )
-        )
-
-        birth_time = (
-            datetime.time.fromisoformat(
-                time_string
-            )
-        )
-
-    except Exception:
-
-        raise ValueError(
-            "Invalid date or time format."
-        )
-
-    try:
-
-        tz = zoneinfo.ZoneInfo(
-            timezone_name
-        )
-
-    except Exception:
-
-        timezone_name = "Asia/Kolkata"
-
-        tz = zoneinfo.ZoneInfo(
-            timezone_name
-        )
-
-    birth_local = (
-        datetime.datetime.combine(
-            birth_date,
-            birth_time
-        ).replace(
-            tzinfo=tz
-        )
-    )
-
-    birth_utc = (
-        birth_local.astimezone(
-            datetime.timezone.utc
-        )
-    )
-
-    # -----------------------------------------------------
-    # JULIAN DAY
-    # -----------------------------------------------------
-
-    decimal_hour = (
-        birth_utc.hour
-        + birth_utc.minute / 60.0
-        + birth_utc.second / 3600.0
-        + birth_utc.microsecond
-        / 3600000000.0
-    )
-
-    jd = swe.julday(
-        birth_utc.year,
-        birth_utc.month,
-        birth_utc.day,
-        decimal_hour
-    )
-
-    # -----------------------------------------------------
-    # SWISS FLAGS
-    # -----------------------------------------------------
-
-    flags = (
-        swe.FLG_SWIEPH
-        | swe.FLG_SIDEREAL
-    )
-
-    # -----------------------------------------------------
-    # HOUSES
-    # -----------------------------------------------------
-
-    house_data = calculate_houses(
-        jd,
-        latitude,
-        longitude
-    )
-
-    ascendant = (
-        house_data["ascendant"]
-    )
-
-    asc_sign = sign_index(
-        ascendant
-    )
-
-    # -----------------------------------------------------
-    # PLANETS
-    # -----------------------------------------------------
-
-    planets = []
-
-    for name, planet_id in PLANETS.items():
-
-        xx = planet_result(
-            jd,
-            planet_id,
-            flags
-        )
-
-        if xx is None or len(xx) < 1:
-
-            raise RuntimeError(
-                "Swiss Ephemeris returned no data for "
-                + name
-            )
-
-        longitude_sidereal = norm360(
-            float(xx[0])
-        )
-
-        sign = sign_index(
-            longitude_sidereal
-        )
-
-        degree = (
-            longitude_sidereal
-            % 30
-        )
-
-        house = (
-            (sign - asc_sign)
-            % 12
-        ) + 1
-
-        planets.append({
-            "name": name,
-            "longitude": longitude_sidereal,
-            "sign": sign,
-            "sign_name": SIGNS[sign],
-            "degree": degree,
-            "house": house,
-        })
-
-    # -----------------------------------------------------
-    # KETU
-    # -----------------------------------------------------
-
-    rahu = next(
-        p for p in planets
-        if p["name"] == "Rahu"
-    )
-
-    ketu_longitude = norm360(
-        rahu["longitude"]
-        + 180.0
-    )
-
-    ketu_sign = sign_index(
-        ketu_longitude
-    )
-
-    ketu_degree = (
-        ketu_longitude
-        % 30
-    )
-
-    ketu_house = (
-        (ketu_sign - asc_sign)
-        % 12
-    ) + 1
-
-    planets.append({
-        "name": "Ketu",
-        "longitude": ketu_longitude,
-        "sign": ketu_sign,
-        "sign_name": SIGNS[ketu_sign],
-        "degree": ketu_degree,
-        "house": ketu_house,
-    })
-
-    # -----------------------------------------------------
-    # MOON
-    # -----------------------------------------------------
-
-    moon = next(
-        p for p in planets
-        if p["name"] == "Moon"
-    )
-
-    # -----------------------------------------------------
-    # NAKSHATRA
-    # -----------------------------------------------------
-
-    nakshatra = (
-        calculate_nakshatra(
-            moon["longitude"]
-        )
-    )
+    showPageError(
+      "Kundli data पढ़ने में error आया। कृपया फिर से Kundli calculate करें।"
+    );
 
-    # -----------------------------------------------------
-    # D9
-    # -----------------------------------------------------
+    return null;
 
-    d9_planets = []
-
-    for planet in planets:
+  }
 
-        d9_planets.append(
-            calculate_navamsa(
-                planet
-            )
-        )
-
-    # -----------------------------------------------------
-    # VIMSHOTTARI
-    # -----------------------------------------------------
-
-    vimshottari = (
-        calculate_vimshottari(
-            moon["longitude"],
-            birth_local
-        )
-    )
-
-    # -----------------------------------------------------
-    # FINAL RESPONSE
-    # -----------------------------------------------------
-
-    return {
-
-        "success": True,
-
-        "input": {
-            "name": payload.get(
-                "name",
-                ""
-            ),
-
-            "date": date_string,
-
-            "time": time_string,
-
-            "place": payload.get(
-                "place",
-                ""
-            ),
-
-            "lat": latitude,
-
-            "lon": longitude,
-
-            "timezone": timezone_name,
-        },
-
-        "astronomy": {
-
-            "julian_day_ut": jd,
-
-            "ayanamsha": (
-                house_data[
-                    "ayanamsha"
-                ]
-            ),
-
-            "ayanamsha_system": "Lahiri",
-        },
-
-        "lagna": {
-
-            "longitude": ascendant,
-
-            "sign": asc_sign,
-
-            "sign_name": SIGNS[
-                asc_sign
-            ],
-
-            "degree": (
-                ascendant % 30
-            ),
-        },
-
-        "planets": planets,
-
-        "nakshatra": nakshatra,
-
-        "d9": {
-
-            "name": "Navamsa",
-
-            "planets": d9_planets,
-        },
-
-        "vimshottari": vimshottari,
-    }
-
-
-# =========================================================
-# VERCEL HTTP HANDLER
-# =========================================================
-
-class handler(
-    BaseHTTPRequestHandler
-):
-
-    def send_json(
-        self,
-        status,
+}
+
+
+/* ========================================================
+   ERROR
+======================================================== */
+
+function showPageError(
+  message
+){
+
+  const el =
+    $("pageError");
+
+
+  if(!el){
+    return;
+  }
+
+
+  el.style.display =
+    "block";
+
+
+  el.textContent =
+    message;
+
+}
+
+
+/* ========================================================
+   RENDER ALL
+======================================================== */
+
+function renderAll(
+  data
+){
+
+  try{
+
+    renderPersonInfo(
+      data
+    );
+
+
+    renderBasicInfo(
+      data
+    );
+
+
+    renderPlanetTable(
+      data
+    );
+
+
+    drawChart(
+      "d1Chart",
+      data,
+      false
+    );
+
+
+    drawChart(
+      "d9Chart",
+      data,
+      true
+    );
+
+
+    renderDasha(
+      data
+    );
+
+  }catch(error){
+
+    console.error(
+      "Chart render error:",
+      error
+    );
+
+
+    showPageError(
+      "Chart render karte waqt error aaya: "
+      +
+      (
+        error.message ||
+        error
+      )
+    );
+
+  }
+
+}
+
+
+/* ========================================================
+   START
+======================================================== */
+
+document.addEventListener(
+  "DOMContentLoaded",
+  function(){
+
+    const data =
+      loadKundli();
+
+
+    if(data){
+
+      renderAll(
         data
-    ):
+      );
 
-        body = json.dumps(
-            data,
-            ensure_ascii=False,
-            default=str
-        ).encode(
-            "utf-8"
-        )
+    }
 
-        self.send_response(
-            status
-        )
+  }
+);
 
-        self.send_header(
-            "Content-Type",
-            "application/json; charset=utf-8"
-        )
+</script>
 
-        self.send_header(
-            "Access-Control-Allow-Origin",
-            "*"
-        )
-
-        self.send_header(
-            "Access-Control-Allow-Methods",
-            "POST, OPTIONS"
-        )
-
-        self.send_header(
-            "Access-Control-Allow-Headers",
-            "Content-Type"
-        )
-
-        self.send_header(
-            "Content-Length",
-            str(len(body))
-        )
-
-        self.end_headers()
-
-        self.wfile.write(
-            body
-        )
-
-    # -----------------------------------------------------
-    # OPTIONS
-    # -----------------------------------------------------
-
-    def do_OPTIONS(self):
-
-        self.send_response(
-            204
-        )
-
-        self.send_header(
-            "Access-Control-Allow-Origin",
-            "*"
-        )
-
-        self.send_header(
-            "Access-Control-Allow-Methods",
-            "POST, OPTIONS"
-        )
-
-        self.send_header(
-            "Access-Control-Allow-Headers",
-            "Content-Type"
-        )
-
-        self.end_headers()
-
-    # -----------------------------------------------------
-    # POST
-    # -----------------------------------------------------
-
-    def do_POST(self):
-
-        try:
-
-            content_length = int(
-                self.headers.get(
-                    "content-length",
-                    "0"
-                )
-            )
-
-            raw_body = (
-                self.rfile.read(
-                    content_length
-                )
-            )
-
-            if not raw_body:
-
-                raise ValueError(
-                    "Request body is empty."
-                )
-
-            payload = json.loads(
-                raw_body.decode(
-                    "utf-8"
-                )
-            )
-
-            result = (
-                calculate_kundli(
-                    payload
-                )
-            )
-
-            self.send_json(
-                200,
-                result
-            )
-
-        except Exception as error:
-
-            self.send_json(
-                400,
-                {
-                    "success": False,
-
-                    "error": str(error),
-
-                    "error_type": (
-                        type(error).__name__
-                    ),
-                }
-            )
+</body>
+</html>
